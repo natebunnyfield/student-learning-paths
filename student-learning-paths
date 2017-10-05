@@ -1,0 +1,61 @@
+#!/usr/bin/env ruby
+
+#
+# Check for two valid input files
+#
+
+if ARGV.empty?
+  puts "Usage: #{$0} domain_order.csv test_scores.csv"
+  exit
+end
+
+domain_order_filename, test_scores_filename = ARGV
+
+[domain_order_filename, test_scores_filename].each do |filename|
+  begin
+    File.open(filename, 'r')
+    File.open(filename, 'r')
+  rescue Errno::ENOENT
+    puts "#{$0}: #{filename}: No such file"
+    exit -1
+  end
+end
+
+#
+# Load csv files
+#
+
+lib_path = File.expand_path(File.join(File.dirname(__FILE__), 'lib'))
+$LOAD_PATH.unshift(lib_path)
+
+require 'csv'
+require 'student'
+
+grades = []
+units = []
+students = []
+
+CSV.foreach(domain_order_filename) do |row|
+  grade = row[0]
+  grades << grade
+  row.drop(1).each do |domain|
+    units << "#{grade}.#{domain}"
+  end
+end
+
+CSV.foreach(test_scores_filename, headers: true) do |row|
+  name = row['Student Name'] || row[0]
+  scores = Hash[row.drop(1).map{|domain, score| [domain.to_sym, score]}]
+  students << Student.new(name: name, scores: scores)
+end
+
+#
+# Generate csv output
+#
+
+require 'learning/path'
+
+students.each do |student|
+  path = Learning::Path.new(grades: grades, student: student, units: units)
+  puts ([student.name] + path.next_units).to_csv
+end
